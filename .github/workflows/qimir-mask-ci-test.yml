@@ -57,25 +57,32 @@ jobs:
           QIMIR_TEX_SIZE: '1024'
         run: qimir_work/blender-4.2.21-linux-x64/blender --background --factory-startup --python qimir_work/package/source/build_qimir_mask.py
 
-      - name: Assemble verification package
+      - name: Assemble optional verification sheets
+        continue-on-error: true
         env:
           QIMIR_OUTPUT: ${{ github.workspace }}/qimir_output
+        run: python3 qimir_work/package/source/assemble_sheet.py
+
+      - name: Record output inventory
+        if: always()
         run: |
           set -euxo pipefail
-          python3 qimir_work/package/source/assemble_sheet.py
+          find qimir_output -maxdepth 3 -type f -printf '%p %s bytes\n' | sort
+
+      - name: Add editable sources to package
+        if: always()
+        continue-on-error: true
+        run: |
           mkdir -p qimir_output/source
           cp qimir_work/package/source/*.py qimir_output/source/
           cp qimir_work/package/README.md qimir_output/README.md
-          cd qimir_output
-          zip -9 -r ../Qimir_GTA_Mask_NATIVE_BLENDER.zip .
 
       - name: Upload native Blender package
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: Qimir-GTA-Mask-Native-Blender
-          path: |
-            qimir_output/**
-            Qimir_GTA_Mask_NATIVE_BLENDER.zip
+          path: qimir_output/**
           if-no-files-found: error
           compression-level: 0
           retention-days: 7
