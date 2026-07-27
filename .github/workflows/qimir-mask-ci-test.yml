@@ -1,0 +1,21 @@
+name: Qimir Mask CI Test
+
+on:
+  pull_request:
+    branches: [master]
+    paths:
+      - '.github/workflows/qimir-mask-ci-test.yml'
+      - 'tools/qimir-ci/**'
+
+permissions:
+  contents: read
+
+jobs:
+  test-runner:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Confirm hosted runner
+        run: |
+          set -euxo pipefail
+          uname -a
+          python3 --version
