@@ -1,4 +1,4 @@
-name: Qimir Mask CI Test
+name: Qimir Mask Native Blender Build
 
 on:
   pull_request:
@@ -11,11 +11,71 @@ permissions:
   contents: read
 
 jobs:
-  test-runner:
+  build-mask:
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     steps:
-      - name: Confirm hosted runner
+      - name: Restore source payload without checking out the large repository
+        env:
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           set -euxo pipefail
-          uname -a
-          python3 --version
+          mkdir -p qimir_work/package
+          : > qimir_work/payload.b64
+          for part in 00 01 02 03 04 05 06; do
+            curl -fL --retry 5 --retry-delay 2 \
+              "https://raw.githubusercontent.com/BaRKyy/SWLOR_NWN/${HEAD_SHA}/tools/qimir-ci/payload.${part}" \
+              >> qimir_work/payload.b64
+          done
+          base64 --decode qimir_work/payload.b64 > qimir_work/payload.tar.gz
+          echo "750f50a603c3ceb2e2ca2ad91b6d2491397233143e22d020df423367f530c7d1  qimir_work/payload.tar.gz" | sha256sum --check
+          tar -xzf qimir_work/payload.tar.gz -C qimir_work/package
+          find qimir_work/package -maxdepth 3 -type f -print
+
+      - name: Install Python dependencies
+        run: python3 -m pip install --disable-pip-version-check --no-cache-dir pillow numpy
+
+      - name: Generate PBR textures
+        env:
+          QIMIR_OUTPUT: ${{ github.workspace }}/qimir_output
+          QIMIR_TEX_SIZE: '1024'
+        run: python3 qimir_work/package/source/generate_textures.py
+
+      - name: Download Blender 4.2 LTS
+        run: |
+          set -euxo pipefail
+          curl -fL --retry 5 --retry-delay 3 \
+            -o qimir_work/blender.tar.xz \
+            https://download.blender.org/release/Blender4.2/blender-4.2.21-linux-x64.tar.xz
+          tar -xf qimir_work/blender.tar.xz -C qimir_work
+          qimir_work/blender-4.2.21-linux-x64/blender --version
+
+      - name: Build render and export mask
+        env:
+          QIMIR_ROOT: ${{ github.workspace }}/qimir_work/package
+          QIMIR_OUTPUT: ${{ github.workspace }}/qimir_output
+          QIMIR_TEX_SIZE: '1024'
+        run: qimir_work/blender-4.2.21-linux-x64/blender --background --factory-startup --python qimir_work/package/source/build_qimir_mask.py
+
+      - name: Assemble verification package
+        env:
+          QIMIR_OUTPUT: ${{ github.workspace }}/qimir_output
+        run: |
+          set -euxo pipefail
+          python3 qimir_work/package/source/assemble_sheet.py
+          mkdir -p qimir_output/source
+          cp qimir_work/package/source/*.py qimir_output/source/
+          cp qimir_work/package/README.md qimir_output/README.md
+          cd qimir_output
+          zip -9 -r ../Qimir_GTA_Mask_NATIVE_BLENDER.zip .
+
+      - name: Upload native Blender package
+        uses: actions/upload-artifact@v4
+        with:
+          name: Qimir-GTA-Mask-Native-Blender
+          path: |
+            qimir_output/**
+            Qimir_GTA_Mask_NATIVE_BLENDER.zip
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 7
