@@ -36,45 +36,53 @@ jobs:
         run: |
           python3 - <<'PY'
           from pathlib import Path
+
           path = Path('qimir_work/package/source/build_qimir_mask.py')
           text = path.read_text(encoding='utf-8')
-          old = '''    for tri in tessellate_polygon(vectors):
-              ids = []
-              for v in tri:
-                  key = (round(v.x, 8), round(v.y, 8))
-                  ids.append(lookup[key][0])
-              triangles.append(tuple(ids))
-          '''
-          new = '''    for tri in tessellate_polygon(vectors):
-              if tri and isinstance(tri[0], int):
-                  triangles.append(tuple(int(index) for index in tri))
-                  continue
-              ids = []
-              for v in tri:
-                  key = (round(v.x, 8), round(v.y, 8))
-                  ids.append(lookup[key][0])
-              triangles.append(tuple(ids))
-          '''
+
+          old = (
+              "    for tri in tessellate_polygon(vectors):\n"
+              "        ids = []\n"
+              "        for v in tri:\n"
+              "            key = (round(v.x, 8), round(v.y, 8))\n"
+              "            ids.append(lookup[key][0])\n"
+              "        triangles.append(tuple(ids))\n"
+          )
+          new = (
+              "    for tri in tessellate_polygon(vectors):\n"
+              "        if tri and isinstance(tri[0], int):\n"
+              "            triangles.append(tuple(int(index) for index in tri))\n"
+              "            continue\n"
+              "        ids = []\n"
+              "        for v in tri:\n"
+              "            key = (round(v.x, 8), round(v.y, 8))\n"
+              "            ids.append(lookup[key][0])\n"
+              "        triangles.append(tuple(ids))\n"
+          )
           if old not in text:
               raise SystemExit('tessellator compatibility target not found')
-          text = text.replace(old, new)
-          old_engine = '''    available = {item.identifier for item in bpy.types.RenderSettings.bl_rna.properties["engine"].enum_items}
-              if "BLENDER_EEVEE_NEXT" in available:
-                  scene.render.engine = "BLENDER_EEVEE_NEXT"
-              elif "BLENDER_EEVEE" in available:
-                  scene.render.engine = "BLENDER_EEVEE"
-              else:
-                  scene.render.engine = "BLENDER_WORKBENCH"
-          '''
-          new_engine = '''    for engine in ("BLENDER_EEVEE_NEXT", "BLENDER_EEVEE", "BLENDER_WORKBENCH"):
-              try:
-                  scene.render.engine = engine
-                  break
-              except Exception:
-                  continue
-          '''
+          text = text.replace(old, new, 1)
+
+          old_engine = (
+              "    available = {item.identifier for item in bpy.types.RenderSettings.bl_rna.properties[\"engine\"].enum_items}\n"
+              "    if \"BLENDER_EEVEE_NEXT\" in available:\n"
+              "        scene.render.engine = \"BLENDER_EEVEE_NEXT\"\n"
+              "    elif \"BLENDER_EEVEE\" in available:\n"
+              "        scene.render.engine = \"BLENDER_EEVEE\"\n"
+              "    else:\n"
+              "        scene.render.engine = \"BLENDER_WORKBENCH\"\n"
+          )
+          new_engine = (
+              "    for engine in (\"BLENDER_EEVEE_NEXT\", \"BLENDER_EEVEE\", \"BLENDER_WORKBENCH\"):\n"
+              "        try:\n"
+              "            scene.render.engine = engine\n"
+              "            break\n"
+              "        except Exception:\n"
+              "            continue\n"
+          )
           if old_engine in text:
-              text = text.replace(old_engine, new_engine)
+              text = text.replace(old_engine, new_engine, 1)
+
           path.write_text(text, encoding='utf-8')
           PY
           python3 -m py_compile qimir_work/package/source/build_qimir_mask.py
