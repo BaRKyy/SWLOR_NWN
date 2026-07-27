@@ -87,8 +87,14 @@ jobs:
           PY
           python3 -m py_compile qimir_work/package/source/build_qimir_mask.py
 
-      - name: Install Python dependencies
-        run: python3 -m pip install --disable-pip-version-check --no-cache-dir pillow numpy
+      - name: Install Python and headless graphics dependencies
+        run: |
+          set -euxo pipefail
+          python3 -m pip install --disable-pip-version-check --no-cache-dir pillow numpy
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libegl1 libgl1 libx11-6 libxext6 libxrender1 libxi6 \
+            libxkbcommon0 libsm6 libice6
 
       - name: Generate PBR textures
         env:
@@ -110,6 +116,7 @@ jobs:
           QIMIR_ROOT: ${{ github.workspace }}/qimir_work/package
           QIMIR_OUTPUT: ${{ github.workspace }}/qimir_output
           QIMIR_TEX_SIZE: '1024'
+          LIBGL_ALWAYS_SOFTWARE: '1'
         run: |
           set -euxo pipefail
           qimir_work/blender-4.2.21-linux-x64/blender \
