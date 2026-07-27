@@ -32,6 +32,53 @@ jobs:
           tar -xzf qimir_work/payload.tar.gz -C qimir_work/package
           find qimir_work/package -maxdepth 3 -type f -print
 
+      - name: Apply Blender 4.2 compatibility fixes
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path('qimir_work/package/source/build_qimir_mask.py')
+          text = path.read_text(encoding='utf-8')
+          old = '''    for tri in tessellate_polygon(vectors):
+              ids = []
+              for v in tri:
+                  key = (round(v.x, 8), round(v.y, 8))
+                  ids.append(lookup[key][0])
+              triangles.append(tuple(ids))
+          '''
+          new = '''    for tri in tessellate_polygon(vectors):
+              if tri and isinstance(tri[0], int):
+                  triangles.append(tuple(int(index) for index in tri))
+                  continue
+              ids = []
+              for v in tri:
+                  key = (round(v.x, 8), round(v.y, 8))
+                  ids.append(lookup[key][0])
+              triangles.append(tuple(ids))
+          '''
+          if old not in text:
+              raise SystemExit('tessellator compatibility target not found')
+          text = text.replace(old, new)
+          old_engine = '''    available = {item.identifier for item in bpy.types.RenderSettings.bl_rna.properties["engine"].enum_items}
+              if "BLENDER_EEVEE_NEXT" in available:
+                  scene.render.engine = "BLENDER_EEVEE_NEXT"
+              elif "BLENDER_EEVEE" in available:
+                  scene.render.engine = "BLENDER_EEVEE"
+              else:
+                  scene.render.engine = "BLENDER_WORKBENCH"
+          '''
+          new_engine = '''    for engine in ("BLENDER_EEVEE_NEXT", "BLENDER_EEVEE", "BLENDER_WORKBENCH"):
+              try:
+                  scene.render.engine = engine
+                  break
+              except Exception:
+                  continue
+          '''
+          if old_engine in text:
+              text = text.replace(old_engine, new_engine)
+          path.write_text(text, encoding='utf-8')
+          PY
+          python3 -m py_compile qimir_work/package/source/build_qimir_mask.py
+
       - name: Install Python dependencies
         run: python3 -m pip install --disable-pip-version-check --no-cache-dir pillow numpy
 
