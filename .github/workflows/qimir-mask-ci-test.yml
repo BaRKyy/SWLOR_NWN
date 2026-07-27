@@ -20,7 +20,7 @@ jobs:
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           set -euxo pipefail
-          mkdir -p qimir_work/package
+          mkdir -p qimir_work/package qimir_output
           : > qimir_work/payload.b64
           for part in 00 01 02 03 04 05 06; do
             curl -fL --retry 5 --retry-delay 2 \
@@ -55,19 +55,25 @@ jobs:
           QIMIR_ROOT: ${{ github.workspace }}/qimir_work/package
           QIMIR_OUTPUT: ${{ github.workspace }}/qimir_output
           QIMIR_TEX_SIZE: '1024'
-        run: qimir_work/blender-4.2.21-linux-x64/blender --background --factory-startup --python qimir_work/package/source/build_qimir_mask.py
+        run: |
+          set -euxo pipefail
+          qimir_work/blender-4.2.21-linux-x64/blender \
+            --background --factory-startup --python-exit-code 1 \
+            --python qimir_work/package/source/build_qimir_mask.py \
+            2>&1 | tee qimir_output/blender_build.log
 
       - name: Assemble optional verification sheets
+        if: always()
         continue-on-error: true
         env:
           QIMIR_OUTPUT: ${{ github.workspace }}/qimir_output
-        run: python3 qimir_work/package/source/assemble_sheet.py
+        run: python3 qimir_work/package/source/assemble_sheet.py 2>&1 | tee qimir_output/assemble_sheet.log
 
       - name: Record output inventory
         if: always()
         run: |
           set -euxo pipefail
-          find qimir_output -maxdepth 3 -type f -printf '%p %s bytes\n' | sort
+          find qimir_output -maxdepth 3 -type f -printf '%p %s bytes\n' | sort | tee qimir_output/inventory.txt
 
       - name: Add editable sources to package
         if: always()
